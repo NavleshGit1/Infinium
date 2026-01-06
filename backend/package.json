@@ -1,0 +1,36 @@
+{
+  "name": "infinium-backend",
+  "version": "1.0.0",
+  "description": "Backend for Infinium AI Food Tracking with Gemini, Cloudinary, and Supabase",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "food-tracking",
+    "gemini",
+    "cloudinary",
+    "supabase"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "@supabase/supabase-js": "^2.38.4",
+    "@google/generative-ai": "^0.3.0",
+    "cloudinary": "^1.40.0",
+    "multer": "^1.4.5-lts.1",
+    "axios": "^1.6.2",
+    "uuid": "^9.0.1",
+    "express-async-errors": "^3.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

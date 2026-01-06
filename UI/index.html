@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinium - AI Food Tracking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; transition: background-color 0.3s; overflow-x: hidden; }
+        html.dark body { background: #0f172a; }
+        .nav-link { cursor: pointer !important; position: relative; }
+        .nav-link.active { background-color: #dbeafe !important; border-left: 3px solid #3b82f6; font-weight: 600; }
+        html.dark .nav-link.active { background-color: #1e293b !important; }
+        .view { animation: fadeIn 0.3s ease-in; }
+        .view.hidden { display: none !important; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .notification { position: fixed; top: 20px; right: 20px; padding: 16px 24px; border-radius: 10px; color: white; font-weight: 500; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .notification.success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .notification.error { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .notification.warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .notification.info { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; transition: all 0.3s; }
+        .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(-2px); }
+        html.dark .card { background: #1e293b; border-color: #334155; }
+        .btn { padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; border: none; transition: all 0.3s; }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        html.dark .btn-secondary { background: #334155; color: #f1f5f9; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .btn.loading { opacity: 0.7; pointer-events: none; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #f3f4f6; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-yellow { background: #fef3c7; color: #92400e; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; align-items: center; justify-content: center; }
+        .modal.active { display: flex; animation: fadeIn 0.3s ease-in; }
+        .modal-content { background: white; border-radius: 12px; padding: 32px; max-width: 500px; width: 90%; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        html.dark .modal-content { background: #1e293b; }
+        input, textarea { background: #f1f5f9; border: 1px solid #cbd5e1; color: #1e293b; padding: 10px 16px; border-radius: 8px; transition: all 0.3s; }
+        input:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        html.dark input, html.dark textarea { background: #334155; border-color: #475569; color: #f1f5f9; }
+        .stat-box { text-align: center; padding: 20px; border-radius: 12px; }
+        .stat-box.success { background: #ecfdf5; }
+        .stat-box.danger { background: #fef2f2; }
+        .stat-box.warning { background: #fffbeb; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Mobile Menu Button -->
+    <button id="mobileMenuBtn" class="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-md">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col fixed lg:static h-screen z-40 transform lg:transform-none transition-transform duration-300 -translate-x-full lg:translate-x-0">
+            <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Infinium</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">AI Food Tracking</p>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <button onclick="switchView(event, 'dashboard')" class="nav-link active w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 text-slate-700 dark:text-slate-300 text-sm font-medium">
+                    <span>📊</span> <span>Dashboard</span>
+                </button>
+                <button onclick="switchView(event, 'inventory')" class="nav-link w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 text-slate-700 dark:text-slate-300 text-sm font-medium">
+                    <span>📦</span> <span>Inventory</span>
+                </button>
+                <button onclick="switchView(event, 'alerts')" class="nav-link w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 text-slate-700 dark:text-slate-300 text-sm font-medium">
+                    <span>🔔</span> <span>Alerts</span>
+                </button>
+                <button onclick="switchView(event, 'recipes')" class="nav-link w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 text-slate-700 dark:text-slate-300 text-sm font-medium">
+                    <span>🍳</span> <span>Recipes</span>
+                </button>
+                <button onclick="switchView(event, 'analysis')" class="nav-link w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 text-slate-700 dark:text-slate-300 text-sm font-medium">
+                    <span>🤖</span> <span>AI Analysis</span>
+                </button>
+                <button onclick="switchView(event, 'fitness')" class="nav-link w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 text-slate-700 dark:text-slate-300 text-sm font-medium">
+                    <span>💪</span> <span>Fitness Tracker</span>
+                </button>
+                <button onclick="switchView(event, 'profile')" class="nav-link w-full text-left px-4 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 text-slate-700 dark:text-slate-300 text-sm font-medium">
+                    <span>👤</span> <span>Profile</span>
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-200 dark:border-slate-700">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="darkModeToggle" class="w-5 h-5">
+                    <span class="text-sm text-slate-700 dark:text-slate-300">Dark Mode</span>
+                </label>
+            </div>
+        </aside>
+
+        <!-- Overlay for mobile -->
+        <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-30 lg:hidden hidden" onclick="closeSidebar()"></div>
+
+        <!-- Add Inventory Item Modal -->
+        <div id="addItemModal" class="modal">
+            <div class="modal-content">
+                <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-4">➕ Add Food Item to Inventory</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Food Name</label>
+                        <input type="text" id="modalItemName" placeholder="e.g., Apple, Chicken Breast..." class="w-full px-4 py-2 rounded-lg">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Quantity</label>
+                            <input type="number" id="modalItemQty" value="1" min="1" class="w-full px-4 py-2 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Calories (per unit)</label>
+                            <input type="number" id="modalItemCals" value="100" min="0" class="w-full px-4 py-2 rounded-lg">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Expiry Date</label>
+                        <input type="date" id="modalItemExpiry" class="w-full px-4 py-2 rounded-lg">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Protein (g)</label>
+                            <input type="text" id="modalItemProtein" placeholder="1g" class="w-full px-4 py-2 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Carbs (g)</label>
+                            <input type="text" id="modalItemCarbs" placeholder="25g" class="w-full px-4 py-2 rounded-lg">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Fat (g)</label>
+                            <input type="text" id="modalItemFat" placeholder="0.3g" class="w-full px-4 py-2 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-900 dark:text-white mb-2">Key Nutrients</label>
+                            <input type="text" id="modalItemNutrients" placeholder="Vitamin C, Fiber..." class="w-full px-4 py-2 rounded-lg">
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button class="btn btn-primary flex-1" onclick="saveNewInventoryItem()">✅ Add to Inventory</button>
+                        <button class="btn btn-secondary flex-1" onclick="closeAddItemModal()">❌ Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <div class="p-4 md:p-8 max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-2xl">
+                    <h2 class="text-3xl font-bold mb-2">Welcome to Infinium</h2>
+                    <p class="text-blue-100">Smart AI-powered food tracking and management</p>
+                </div>
+
+                <!-- Connection Status -->
+                <div id="connectionStatus" class="mb-6 p-4 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"></div>
+
+                <!-- Dashboard View -->
+                <div id="dashboard" class="view">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                        <div class="card"><div class="flex justify-between items-start mb-4"><h3 class="font-semibold text-slate-900 dark:text-white">📊 Total Items</h3><span class="text-3xl font-bold text-blue-600" data-stat="total">12</span></div><p class="text-sm text-slate-600 dark:text-slate-400">In your inventory</p></div>
+                        <div class="card"><div class="flex justify-between items-start mb-4"><h3 class="font-semibold text-slate-900 dark:text-white">⚠️ Expiring Soon</h3><span class="text-3xl font-bold text-red-600" data-stat="expiring">3</span></div><p class="text-sm text-slate-600 dark:text-slate-400">Need attention!</p></div>
+                        <div class="card"><div class="flex justify-between items-start mb-4"><h3 class="font-semibold text-slate-900 dark:text-white">✨ Freshness Avg</h3><span class="text-3xl font-bold text-green-600" data-stat="freshness">78%</span></div><p class="text-sm text-slate-600 dark:text-slate-400">Quality score</p></div>
+                    </div>
+                    <div class="card mb-8"><h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">📈 Recent Activity</h3><div class="space-y-3">
+                        <div class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700" onclick="showNotification('Apple details: 5 items, expires 2026-01-12', 'info')"><span class="text-2xl">🍎</span><div class="flex-1"><p class="font-medium text-slate-900 dark:text-white">Apple</p><p class="text-xs text-slate-600 dark:text-slate-400">Added 2 hours ago</p></div><span class="text-sm">✅</span></div>
+                        <div class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700" onclick="showNotification('Carrot details: 3 items, fresh', 'info')"><span class="text-2xl">🥕</span><div class="flex-1"><p class="font-medium text-slate-900 dark:text-white">Carrot</p><p class="text-xs text-slate-600 dark:text-slate-400">Added 5 hours ago</p></div><span class="text-sm">✅</span></div>
+                        <div class="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-700 cursor-pointer hover:bg-red-100" onclick="showNotification('Banana expiring soon! Use today for best quality', 'warning')"><span class="text-2xl">🍌</span><div class="flex-1"><p class="font-medium text-red-900 dark:text-red-200">Banana - EXPIRING</p><p class="text-xs text-red-700 dark:text-red-300">Expires tomorrow! 🚨</p></div><span class="text-sm">⚠️</span></div>
+                    </div></div>
+                    
+                    <div class="card"><h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4">🥗 AI-Powered Weekly Meal Plan (Personalized by Gemini)</h3><p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Calorie Target: <span class="font-bold text-blue-600" id="weeklyCalTarget">2000</span> kcal/day</p><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4" id="weeklyMealPlan"><div class="text-center p-3 bg-slate-100 dark:bg-slate-700 rounded animate-pulse">Loading meal plan...</div></div><button class="btn btn-primary w-full" onclick="generateWeeklyMealPlan()">🧠 Generate Weekly Plan</button></div>
+                </div>
+
+                <!-- Inventory View -->
+                <div id="inventory" class="view hidden">
+                    <!-- Add from Analysis Section -->
+                    <div class="card mb-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border border-green-200 dark:border-green-700">
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-3">📸 Add from AI Analysis</h3>
+                        <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Items from your food analysis will appear here. Click "Add to Inventory" to add them.</p>
+                        <div id="pendingFoodItems" class="space-y-2">
+                            <p class="text-xs text-slate-500 dark:text-slate-400 italic">No pending items. Upload and analyze food from AI Analysis section.</p>
+                        </div>
+                    </div>
+
+                    <!-- Inventory Search & Filter -->
+                    <div class="card mb-6">
+                        <div class="flex gap-3 mb-4">
+                            <input type="text" id="inventorySearch" placeholder="Search food items..." class="flex-1">
+                            <select id="inventoryFilter" class="px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
+                                <option value="all">All Items</option>
+                                <option value="fresh">Fresh Only</option>
+                                <option value="expiring">Expiring Soon</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Current Inventory -->
+                    <div id="inventoryContainer" class="space-y-4">
+                        <!-- Inventory items will be rendered here -->
+                    </div>
+
+                    <button class="btn btn-primary w-full mt-6" onclick="openAddItemModal()">➕ Add New Item Manually</button>
+                </div>
+
+                <!-- Alerts View -->
+                <div id="alerts" class="view hidden">
+                    <!-- Expiry Alerts Section -->
+                    <div class="card mb-6">
+                        <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">⚠️</span>
+                                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Expiry Alerts</h3>
+                                <span class="px-3 py-1 bg-red-100 dark:bg-red-900/50 text-red-900 dark:text-red-200 text-sm font-semibold rounded-full" id="expiryCount">0</span>
+                            </div>
+                            <button class="btn btn-primary text-sm" onclick="checkExpiryWithGemini()">🤖 Check with Gemini</button>
+                        </div>
+                        <div class="space-y-3" id="expiryAlertsContainer">
+                            <!-- Alerts will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Shopping List Section -->
+                    <div class="card mb-6">
+                        <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">🛒</span>
+                                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Shopping List (Next 7 Days)</h3>
+                                <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-200 text-sm font-semibold rounded-full" id="shoppingCount">0</span>
+                            </div>
+                            <button class="btn btn-primary text-sm" onclick="generateShoppingList()">📋 Generate List</button>
+                        </div>
+                        <div class="space-y-3" id="shoppingListContainer">
+                            <p class="text-slate-600 dark:text-slate-400 text-center py-4">Click 'Generate List' to create your weekly shopping plan</p>
+                        </div>
+                    </div>
+
+                    <!-- AI Insights Section -->
+                    <div class="card bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-700">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="text-2xl">🧠</span>
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-white">AI Insights by Gemini</h3>
+                        </div>
+                        <div class="space-y-3" id="aiInsightsContainer">
+                            <p class="text-sm text-purple-700 dark:text-purple-300">💡 Gemini AI will analyze your inventory and provide smart recommendations for waste reduction and meal planning</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recipes View -->
+                <div id="recipes" class="view hidden">
+                    <!-- Recipe Search Section -->
+                    <div class="card mb-6">
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">🔍 Search Recipes by Dish Name</h3>
+                        <div class="flex gap-3 mb-4">
+                            <input type="text" id="dishNameInput" placeholder="Enter dish name (e.g., Pasta, Salad, Chicken...)" class="flex-1">
+                            <button class="btn btn-primary" id="fetchRecipeBtn" onclick="searchRecipeByDish()">Search</button>
+                        </div>
+                        <div id="recipeLoadingSpinner" class="hidden text-center py-4">
+                            <span class="spinner"></span>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-2">Fetching recipe from Gemini...</p>
+                        </div>
+                    </div>
+
+                    <!-- Calorie-Based Suggestion Bar -->
+                    <div class="card mb-6 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/30 border border-blue-200 dark:border-blue-700">
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">💡 Suggested Recipes Based on Your Calorie Intake</h3>
+                        <div id="calorieBasedSuggestions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Suggestions will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Fetched Recipes Display -->
+                    <div id="fetchedRecipesContainer" class="hidden">
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">🍳 Recipe Results</h3>
+                        <div id="recipeResults" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Fetched recipes will be displayed here -->
+                        </div>
+                    </div>
+
+                    <p id="noRecipesMsg" class="text-center text-slate-600 dark:text-slate-400 mt-6">🤖 <strong>Search for a dish or view AI-powered suggestions based on your calorie intake</strong></p>
+                </div>
+
+                <!-- AI Analysis View -->
+                <div id="analysis" class="view hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="card"><h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">📸 Food Image Analysis</h3><p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Upload food image for AI nutrition analysis</p><div class="mb-4 p-4 border-2 border-dashed border-blue-400 rounded-lg text-center bg-blue-50 dark:bg-blue-900/20"><input type="file" id="foodImage" accept="image/*" style="display:none;" onchange="analyzeFood()"><button class="btn btn-primary" onclick="document.getElementById('foodImage').click()">📷 Choose Image</button><p id="imagePreview" class="text-xs text-slate-600 dark:text-slate-400 mt-2">PNG, JPG, GIF up to 5MB</p></div><button class="btn btn-secondary w-full" onclick="submitFoodAnalysis()">🔍 Analyze with Gemini AI</button></div>
+                        <div class="card"><h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">📊 Recent Analysis</h3><div class="space-y-3" id="analysisHistory"><div class="text-sm text-slate-600 dark:text-slate-400">No analyses yet. Upload an image to start!</div></div></div>
+                    </div>
+                    
+                    <div class="card mb-6"><h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">🥗 AI-Generated Diet Plan (by Gemini)</h3><div class="space-y-4" id="dietPlanContainer"><div class="text-sm text-slate-600 dark:text-slate-400">Click button below to generate personalized diet plan</div></div><button class="btn btn-primary w-full mt-4" onclick="generateDietPlan()">🧠 Generate Diet Plan</button></div>
+
+                    <div class="card mb-6"><h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">🤖 AI Recommendations (Powered by Google Gemini)</h3><div class="space-y-4">
+                        <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700 cursor-pointer hover:bg-blue-100" onclick="showNotification('Gemini AI suggests: Use bananas and milk soon. Buy more fresh vegetables for variety.', 'info')"><p class="font-medium text-blue-900 dark:text-blue-200 mb-2">📊 Smart Recommendations</p><p class="text-sm text-blue-700 dark:text-blue-300">Focus on using bananas & milk. Buy fresh vegetables 🥬</p></div>
+                        <div class="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-700 cursor-pointer hover:bg-green-100" onclick="showNotification('Your diet is excellent! Keep balanced intake with fruits and vegetables.', 'success')"><p class="font-medium text-green-900 dark:text-green-200 mb-2">✅ Health Analysis</p><p class="text-sm text-green-700 dark:text-green-300">Excellent nutrition balance! Continue with current patterns 💪</p></div>
+                        <div class="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-700 cursor-pointer hover:bg-purple-100" onclick="showNotification('Gemini uses advanced ML to predict waste, suggest recipes, and optimize your shopping. Powered by Google Generative AI.', 'info')"><p class="font-medium text-purple-900 dark:text-purple-200 mb-2">🧠 Gemini AI Engine</p><p class="text-sm text-purple-700 dark:text-purple-300">Advanced analysis for meal planning, waste reduction & health 🚀</p></div>
+                    </div></div>
+                    <button class="btn btn-primary w-full" onclick="showNotification('💡 Gemini AI is analyzing your inventory in real-time...', 'info')">🔄 Refresh All Analysis</button>
+                </div>
+
+                <!-- Fitness Tracker View -->
+                <div id="fitness" class="view hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="card bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/30 border border-blue-200 dark:border-blue-700">
+                            <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">💪 Today's Workout</h3>
+                            <div class="space-y-4">
+                                <div class="p-3 bg-white dark:bg-slate-800 rounded-lg">
+                                    <p class="text-xs text-slate-600 dark:text-slate-400 mb-1">Duration</p>
+                                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400" id="workoutDuration">0 min</p>
+                                </div>
+                                <div class="p-3 bg-white dark:bg-slate-800 rounded-lg">
+                                    <p class="text-xs text-slate-600 dark:text-slate-400 mb-1">Calories Burned</p>
+                                    <p class="text-2xl font-bold text-orange-600 dark:text-orange-400" id="caloriesBurned">0 kcal</p>
+                                </div>
+                                <button class="btn btn-primary w-full" onclick="startWorkout()">▶️ Start Workout</button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">📊 Fitness Goals</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <div class="flex justify-between mb-2">
+                                        <p class="text-sm text-slate-700 dark:text-slate-300">Weekly Exercise Goal</p>
+                                        <p class="text-sm font-bold text-blue-600">4/7 days</p>
+                                    </div>
+                                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                        <div class="bg-blue-600 h-2 rounded-full" style="width: 57%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between mb-2">
+                                        <p class="text-sm text-slate-700 dark:text-slate-300">Daily Step Goal</p>
+                                        <p class="text-sm font-bold text-green-600">8,234 / 10,000</p>
+                                    </div>
+                                    <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                                        <div class="bg-green-600 h-2 rounded-full" style="width: 82%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI-Generated Workout Plan -->
+                    <div class="card mb-6 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-700">
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">🤖 AI Fitness Plan (by Gemini)</h3>
+                        <div class="space-y-4" id="aiWorkoutPlan">
+                            <div class="text-sm text-slate-600 dark:text-slate-400">Click button below to generate personalized workout plan</div>
+                        </div>
+                        <button class="btn btn-primary w-full mt-4" onclick="generateAIWorkoutPlan()">🧠 Generate Workout Plan</button>
+                    </div>
+
+                    <!-- Workout History -->
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">📋 Recent Workouts</h3>
+                        <div class="space-y-3" id="workoutHistory">
+                            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p class="font-medium text-slate-900 dark:text-white">🏃 Running</p>
+                                    <p class="text-xs text-slate-600 dark:text-slate-400">45 min • Jan 5, 2026</p>
+                                </div>
+                                <span class="text-lg font-bold text-orange-600">385 cal</span>
+                            </div>
+                            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p class="font-medium text-slate-900 dark:text-white">🏋️ Weight Training</p>
+                                    <p class="text-xs text-slate-600 dark:text-slate-400">60 min • Jan 4, 2026</p>
+                                </div>
+                                <span class="text-lg font-bold text-blue-600">520 cal</span>
+                            </div>
+                            <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p class="font-medium text-slate-900 dark:text-white">🧘 Yoga</p>
+                                    <p class="text-xs text-slate-600 dark:text-slate-400">30 min • Jan 3, 2026</p>
+                                </div>
+                                <span class="text-lg font-bold text-green-600">180 cal</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gemini AI Recommendations -->
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">💡 AI Fitness Recommendations</h3>
+                        <div class="space-y-3">
+                            <div class="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-700 cursor-pointer hover:bg-green-100" onclick="showNotification('✅ Great progress! You\'re on pace to meet your weekly goals. Keep up the consistency!', 'success')">
+                                <p class="font-medium text-green-900 dark:text-green-200 mb-1">✅ Progress Update</p>
+                                <p class="text-sm text-green-700 dark:text-green-300">You're performing well! Increase intensity for better results.</p>
+                            </div>
+                            <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700 cursor-pointer hover:bg-blue-100" onclick="showNotification('💡 Recovery is key! Ensure 7-9 hours of sleep and stretch for 10 minutes daily.', 'info')">
+                                <p class="font-medium text-blue-900 dark:text-blue-200 mb-1">💡 Recovery Tips</p>
+                                <p class="text-sm text-blue-700 dark:text-blue-300">Focus on rest days and proper nutrition.</p>
+                            </div>
+                            <div class="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-700 cursor-pointer hover:bg-purple-100" onclick="showNotification('🎯 Gemini AI creates personalized plans based on your fitness level, goals, and available time. Powered by Google Generative AI.', 'info')">
+                                <p class="font-medium text-purple-900 dark:text-purple-200 mb-1">🎯 AI-Powered Analysis</p>
+                                <p class="text-sm text-purple-700 dark:text-purple-300">Personalized recommendations using machine learning 🚀</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile View -->
+                <div id="profile" class="view hidden">
+                    <!-- Login Screen -->
+                    <div id="loginScreen" class="min-h-screen flex items-center justify-center py-12">
+                        <div class="w-full max-w-md">
+                            <!-- Logo Section -->
+                            <div class="text-center mb-8">
+                                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full shadow-lg mb-4">
+                                    <span class="text-5xl">🍎</span>
+                                </div>
+                                <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Infinium</h1>
+                                <p class="text-slate-600 dark:text-slate-400 mt-1">Smart Nutrition & Fitness</p>
+                            </div>
+
+                            <!-- Login Card -->
+                            <div class="card border-0 shadow-xl">
+                                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6 text-center">Welcome Back</h2>
+
+                                <div class="space-y-4 mb-6">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Username or Email</label>
+                                        <input type="text" id="loginEmail" placeholder="Enter username or email" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Password</label>
+                                        <input type="password" id="loginPassword" placeholder="Enter your password" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
+
+                                <button onclick="handleLogin()" class="w-full btn btn-primary py-3 font-semibold rounded-lg mb-4 transition-all hover:shadow-lg">
+                                    🔓 Sign In
+                                </button>
+
+                                <div class="relative mb-6">
+                                    <div class="absolute inset-0 flex items-center">
+                                        <div class="w-full border-t border-slate-200 dark:border-slate-700"></div>
+                                    </div>
+                                    <div class="relative flex justify-center text-sm">
+                                        <span class="px-2 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400">or</span>
+                                    </div>
+                                </div>
+
+                                <p class="text-center text-slate-600 dark:text-slate-400">
+                                    Don't have an account?
+                                    <button onclick="showSignupScreen()" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline">Sign up here</button>
+                                </p>
+
+                                <p class="text-center text-xs text-slate-500 dark:text-slate-500 mt-6">
+                                    💡 Demo: Use "alex.johnson" / "Password123!"
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signup Screen -->
+                    <div id="signupScreen" class="hidden min-h-screen flex items-center justify-center py-12">
+                        <div class="w-full max-w-md">
+                            <!-- Logo Section -->
+                            <div class="text-center mb-8">
+                                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full shadow-lg mb-4">
+                                    <span class="text-5xl">🍎</span>
+                                </div>
+                                <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Infinium</h1>
+                                <p class="text-slate-600 dark:text-slate-400 mt-1">Join Our Community</p>
+                            </div>
+
+                            <!-- Signup Card -->
+                            <div class="card border-0 shadow-xl">
+                                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6 text-center">Create Account</h2>
+
+                                <div class="space-y-4 mb-6">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Full Name</label>
+                                        <input type="text" id="signupName" placeholder="Your full name" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Email Address</label>
+                                        <input type="email" id="signupEmail" placeholder="your@email.com" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Username</label>
+                                        <input type="text" id="signupUsername" placeholder="Choose a username" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Password</label>
+                                        <input type="password" id="signupPassword" placeholder="Min 8 characters" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Phone Number</label>
+                                        <input type="tel" id="signupPhone" placeholder="+1 (555) 000-0000" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Age</label>
+                                        <input type="number" id="signupAge" min="13" max="120" placeholder="Your age" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
+
+                                <button onclick="handleSignup()" class="w-full btn btn-primary py-3 font-semibold rounded-lg mb-4 transition-all hover:shadow-lg">
+                                    ✨ Create Account
+                                </button>
+
+                                <p class="text-center text-slate-600 dark:text-slate-400">
+                                    Already have an account?
+                                    <button onclick="showLoginScreen()" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline">Sign in here</button>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Profile Screen -->
+                    <div id="profileScreen" class="hidden">
+                        <!-- Profile Header -->
+                        <div class="mb-8">
+                            <div class="card bg-gradient-to-r from-blue-500 to-cyan-500 dark:from-blue-600 dark:to-cyan-600 border-0 relative overflow-hidden">
+                                <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                                <div class="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+                                <div class="relative z-10 flex items-end justify-between pb-6">
+                                    <div class="flex items-end gap-6">
+                                        <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center text-5xl shadow-lg border-4 border-white">
+                                            👤
+                                        </div>
+                                        <div class="text-white pb-2">
+                                            <h2 class="text-3xl font-bold" id="profileFullName">User</h2>
+                                            <p class="text-blue-100 text-sm" id="profileEmail">email@example.com</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="logoutBtn" class="btn btn-secondary px-6 py-2 font-semibold rounded-lg" onclick="doLogout()">
+                                        🚪 Logout
+                                    </button>
+                                </div>
+                        </div>
+
+                        <!-- Personal Information Section -->
+                        <div class="card mb-6">
+                            <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-200 dark:border-slate-700">
+                                <span class="text-2xl">👤</span>
+                                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Personal Information</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Full Name</label>
+                                    <input type="text" id="settingName" placeholder="Full name" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">✉️ Email Address</label>
+                                    <input type="email" id="settingEmail" placeholder="email@example.com" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">📞 Phone Number</label>
+                                    <input type="tel" id="settingPhone" placeholder="+1 (555) 000-0000" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">🎂 Age</label>
+                                    <input type="number" id="settingAge" placeholder="Your age" min="13" max="120" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Health & Goals Section -->
+                        <div class="card mb-6">
+                            <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-200 dark:border-slate-700">
+                                <span class="text-2xl">⚕️</span>
+                                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Health & Nutrition Goals</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">🍽️ Diet Type</label>
+                                    <select id="settingDiet" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <option>Vegetarian</option>
+                                        <option>Vegan</option>
+                                        <option>Omnivore</option>
+                                        <option>Keto</option>
+                                        <option>Paleo</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">🎯 Daily Calorie Goal</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" id="settingCal" placeholder="2000" class="flex-1 px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <span class="text-slate-600 dark:text-slate-400 font-medium">kcal</span>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">⚠️ Allergies & Restrictions</label>
+                                    <textarea id="settingAllergies" placeholder="e.g., Nuts, Dairy, Shellfish" class="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" style="min-height: 90px;"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-3 mt-8">
+                            <button class="flex-1 btn btn-primary px-6 py-3 font-semibold rounded-lg transition-all hover:shadow-lg" onclick="saveSettings()">
+                                <span class="mr-2">💾</span> Save Changes
+                            </button>
+                            <button class="flex-1 btn btn-secondary px-6 py-3 font-semibold rounded-lg transition-all hover:shadow-lg" onclick="resetProfile()">
+                                <span class="mr-2">↩️</span> Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==================== GLOBAL STATE ====================
+        const appState = {
+            currentView: 'dashboard',
+            backendConnected: false,
+            isLoggedIn: false,
+            currentUser: null,
+            users: [
+                { id: 1, username: 'alex.johnson', email: 'alex@example.com', password: 'Password123!', fullName: 'Alex Johnson', phone: '+1 (555) 123-4567', age: 35, diet: 'Omnivore', calorieGoal: 2000, allergies: 'Shellfish, Peanuts' }
+            ],
+            pendingAnalyzedFoods: [], // Foods from analysis awaiting to be added to inventory
+            inventory: [
+                { id: 1, name: 'Apple', emoji: '🍎', qty: 5, fresh: true, expiry: '2026-01-12', calories: 95, protein: '0.5g', carbs: '25g', fat: '0.3g', fiber: '4g', nutrients: 'Vitamin C, Antioxidants', imageUrl: null, sourceAnalysis: false, addedDate: new Date().toLocaleDateString() },
+                { id: 2, name: 'Banana', emoji: '🍌', qty: 2, fresh: false, expiry: '2026-01-07', calories: 105, protein: '1.3g', carbs: '27g', fat: '0.3g', fiber: '3g', nutrients: 'Potassium, Vitamin B6', imageUrl: null, sourceAnalysis: false, addedDate: new Date().toLocaleDateString() },
+                { id: 3, name: 'Carrot', emoji: '🥕', qty: 3, fresh: true, expiry: '2026-01-15', calories: 41, protein: '0.9g', carbs: '10g', fat: '0.2g', fiber: '2.8g', nutrients: 'Beta Carotene, Vitamin A', imageUrl: null, sourceAnalysis: false, addedDate: new Date().toLocaleDateString() },
+                { id: 4, name: 'Milk', emoji: '🥛', qty: 1, fresh: true, expiry: '2026-01-10', calories: 149, protein: '7.7g', carbs: '12g', fat: '7.9g', fiber: '0g', nutrients: 'Calcium, Protein, Vitamin D', imageUrl: null, sourceAnalysis: false, addedDate: new Date().toLocaleDateString() }
+            ],
+            fitnessData: {
+                todayDuration: 0,
+                caloriesBurned: 0,
+                weeklyExerciseDays: 4,
+                dailySteps: 8234,
+                workouts: [
+                    { id: 1, name: 'Running', emoji: '🏃', duration: 45, calories: 385, date: 'Jan 5, 2026' },
+                    { id: 2, name: 'Weight Training', emoji: '🏋️', duration: 60, calories: 520, date: 'Jan 4, 2026' },
+                    { id: 3, name: 'Yoga', emoji: '🧘', duration: 30, calories: 180, date: 'Jan 3, 2026' }
+                ]
+            },
+            recipes: [
+                { name: 'Apple Pie', icon: '🍳', desc: 'Delicious apple pie', items: ['Apple'] },
+                { name: 'Veggie Stir Fry', icon: '🍲', desc: 'Fresh vegetables', items: ['Carrot'] }
+            ]
+        };
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function log(msg, type = 'info') {
+            console.log(`[${type.toUpperCase()}] ${msg}`);
+        }
+
+        function showNotification(message, type = 'info', duration = 3000) {
+            const n = document.createElement('div');
+            n.className = `notification ${type}`;
+            n.textContent = message;
+            document.body.appendChild(n);
+            setTimeout(() => {
+                n.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => n.remove(), 300);
+            }, duration);
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.add('-translate-x-full');
+            document.getElementById('sidebarOverlay').classList.add('hidden');
+            log('Sidebar closed', 'ui');
+        }
+
+        function openSidebar() {
+            document.getElementById('sidebar').classList.remove('-translate-x-full');
+            document.getElementById('sidebarOverlay').classList.remove('hidden');
+            log('Sidebar opened', 'ui');
+        }
+
+        // ==================== VIEW MANAGEMENT ====================
+        function switchView(e, viewName) {
+            e?.preventDefault();
+            log(`Switching to view: ${viewName}`, 'nav');
+
+            // Hide all views
+            document.querySelectorAll('.view').forEach(v => {
+                v.classList.add('hidden');
+            });
+
+            // Show selected view
+            const view = document.getElementById(viewName);
+            if (view) {
+                view.classList.remove('hidden');
+            } else {
+                log(`View ${viewName} not found!`, 'error');
+                return;
+            }
+
+            // Special handling for profile view
+            if (viewName === 'profile') {
+                if (appState.isLoggedIn) {
+                    showProfileScreen();
+                } else {
+                    showLoginScreen();
+                }
+            }
+
+            // Update active nav link
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            if (e && e.currentTarget) {
+                e.currentTarget.classList.add('active');
+            }
+
+            appState.currentView = viewName;
+            closeSidebar();
+            window.scrollTo(0, 0);
+        }
+
+        // ==================== BACKEND COMMUNICATION ====================
+        async function checkBackendConnection() {
+            try {
+                const response = await fetch('/health', { 
+                    method: 'GET',
+                    timeout: 5000
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    appState.backendConnected = true;
+                    document.getElementById('connectionStatus').innerHTML = 
+                        '<strong style="color: #166534;">✅ Backend Connected</strong> - Running on port 3000 • All features available';
+                    log('Backend connected successfully', 'success');
+                    return true;
+                }
+            } catch (e) {
+                appState.backendConnected = false;
+                log('Backend connection failed: ' + e.message, 'error');
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<strong style="color: #92400e;">⚠️ Offline Mode</strong> - Backend not responding • Using demo data';
+                showNotification('⚠️ Running in demo mode (backend offline)', 'warning', 5000);
+                return false;
+            }
+        }
+
+        // ==================== INVENTORY MANAGEMENT ====================
+        function addInventoryItem() {
+            const name = prompt('Enter food name:');
+            if (!name) return;
+            
+            const item = {
+                id: appState.inventory.length + 1,
+                name: name,
+                emoji: '❓',
+                qty: 1,
+                fresh: true,
+                expiry: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0]
+            };
+            
+            appState.inventory.push(item);
+            showNotification(`✅ Added ${name} to inventory`, 'success');
+            log(`Added item: ${name}`, 'inventory');
+            renderInventoryView();
+        }
+
+        function removeInventoryItem(id) {
+            const item = appState.inventory.find(i => i.id === id);
+            if (!item) return;
+            
+            if (confirm(`Remove ${item.name} from inventory?`)) {
+                appState.inventory = appState.inventory.filter(i => i.id !== id);
+                showNotification(`Removed ${item.name}`, 'info');
+                log(`Removed item: ${item.name}`, 'inventory');
+                renderInventoryView();
+            }
+        }
+
+        function addInventoryItem() {
+            const name = prompt('Enter food name:');
+            if (!name) return;
+
+            const item = {
+                id: appState.inventory.length + 1,
+                name: name,
+                emoji: '❓',
+                qty: 1,
+                fresh: true,
+                expiry: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
+                calories: 100,
+                protein: '0g',
+                carbs: '0g',
+                fat: '0g',
+                nutrients: 'Not specified',
+                imageUrl: null,
+                sourceAnalysis: false,
+                addedDate: new Date().toLocaleDateString()
+            };
+            
+            appState.inventory.push(item);
+            showNotification(`✅ Added ${name} to inventory`, 'success');
+            log(`Added item: ${name}`, 'inventory');
+            renderInventoryView();
+        }
+
+        // ==================== RENDERING FUNCTIONS ====================
+        function renderInventoryView() {
+            const html = `
+                <div id="inventoryContent" class="space-y-6">
+                    ${appState.inventory.length === 0 ? `
+                        <div class="card text-center py-12">
+                            <p class="text-slate-600 dark:text-slate-400 text-lg">📦 No items in inventory</p>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">Upload food images for analysis or add items manually to get started.</p>
+                        </div>
+                    ` : `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${appState.inventory.map(item => `
+                                <div class="card overflow-hidden hover:shadow-lg transition-shadow">
+                                    ${item.imageUrl ? `
+                                        <div class="w-full h-40 bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                                            <img src="${item.imageUrl}" alt="${item.name}" class="w-full h-full object-cover">
+                                        </div>
+                                    ` : `
+                                        <div class="w-full h-40 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center">
+                                            <span class="text-5xl">${item.emoji}</span>
+                                        </div>
+                                    `}
+                                    
+                                    <div class="p-4">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h4 class="font-bold text-slate-900 dark:text-white text-lg">${item.name}</h4>
+                                                <p class="text-xs text-slate-500 dark:text-slate-400">Added ${item.addedDate}</p>
+                                            </div>
+                                            ${item.sourceAnalysis ? `<span class="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-full">📸 AI</span>` : ''}
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
+                                            <div class="bg-slate-50 dark:bg-slate-700 p-2 rounded">
+                                                <p class="text-slate-600 dark:text-slate-400">Quantity</p>
+                                                <p class="font-semibold text-slate-900 dark:text-white">${item.qty} units</p>
+                                            </div>
+                                            <div class="bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
+                                                <p class="text-orange-700 dark:text-orange-300">Calories</p>
+                                                <p class="font-semibold text-orange-900 dark:text-orange-200">${item.calories} cal</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
+                                            <div class="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-center">
+                                                <p class="text-blue-600 dark:text-blue-300 text-xs">Protein</p>
+                                                <p class="font-bold text-blue-900 dark:text-blue-200">${item.protein}</p>
+                                            </div>
+                                            <div class="bg-purple-50 dark:bg-purple-900/20 p-2 rounded text-center">
+                                                <p class="text-purple-600 dark:text-purple-300 text-xs">Carbs</p>
+                                                <p class="font-bold text-purple-900 dark:text-purple-200">${item.carbs}</p>
+                                            </div>
+                                            <div class="bg-pink-50 dark:bg-pink-900/20 p-2 rounded text-center">
+                                                <p class="text-pink-600 dark:text-pink-300 text-xs">Fat</p>
+                                                <p class="font-bold text-pink-900 dark:text-pink-200">${item.fat}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3 p-2 bg-slate-50 dark:bg-slate-700 rounded text-xs">
+                                            <p class="text-slate-600 dark:text-slate-400 mb-1"><strong>🥗 Nutrients:</strong></p>
+                                            <p class="text-slate-700 dark:text-slate-300">${item.nutrients}</p>
+                                        </div>
+                                        
+                                        <div class="flex justify-between items-center text-xs mb-3">
+                                            <div class="flex items-center gap-1">
+                                                <span class="${item.fresh ? 'text-green-600' : 'text-red-600'} font-bold">📅</span>
+                                                <span class="${item.fresh ? 'text-green-600' : 'text-red-600'}">
+                                                    ${item.fresh ? '✅ Fresh' : '⚠️ Expiring'} • ${item.expiry}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex gap-2">
+                                            <button onclick="updateInventoryQty(${item.id}, 1)" class="btn btn-secondary flex-1" style="padding: 6px; font-size: 11px;">➕ Add</button>
+                                            <button onclick="removeInventoryItem(${item.id})" class="btn btn-secondary flex-1" style="padding: 6px; font-size: 11px;">❌ Remove</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            `;
+            document.getElementById('inventoryContainer').innerHTML = html;
+        }
+        
+        function updateInventoryQty(id, change) {
+            const item = appState.inventory.find(i => i.id === id);
+            if (item) {
+                item.qty = Math.max(1, item.qty + change);
+                renderInventoryView();
+                showNotification(`Updated ${item.name} quantity to ${item.qty}`, 'info');
+            }
+        }
+
+        function renderAlertsView() {
+            updateExpiryAlerts();
+            log('Alerts view rendered', 'alerts');
+        }
+
+        function updateExpiryAlerts() {
+            const today = new Date();
+            const expiringItems = appState.inventory
+                .map(item => ({
+                    ...item,
+                    daysUntilExpiry: Math.ceil((new Date(item.expiry) - today) / (1000 * 60 * 60 * 24))
+                }))
+                .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
+                .filter(item => item.daysUntilExpiry <= 5);
+
+            document.getElementById('expiryCount').textContent = expiringItems.length;
+
+            const html = expiringItems.length > 0 ? expiringItems.map(item => {
+                let bgColor, textColor, borderColor, icon;
+                if (item.daysUntilExpiry <= 0) {
+                    bgColor = 'bg-red-50 dark:bg-red-900/30';
+                    textColor = 'text-red-900 dark:text-red-200';
+                    borderColor = 'border-red-200 dark:border-red-700';
+                    icon = '🚨';
+                } else if (item.daysUntilExpiry <= 1) {
+                    bgColor = 'bg-orange-50 dark:bg-orange-900/30';
+                    textColor = 'text-orange-900 dark:text-orange-200';
+                    borderColor = 'border-orange-200 dark:border-orange-700';
+                    icon = '⚠️';
+                } else {
+                    bgColor = 'bg-yellow-50 dark:bg-yellow-900/30';
+                    textColor = 'text-yellow-900 dark:text-yellow-200';
+                    borderColor = 'border-yellow-200 dark:border-yellow-700';
+                    icon = '💛';
+                }
+
+                const statusText = item.daysUntilExpiry <= 0 ? '(EXPIRED)' : 
+                                 item.daysUntilExpiry === 1 ? '(tomorrow)' : 
+                                 `(in ${item.daysUntilExpiry} days)`;
+
+                return `
+                    <div class="p-4 ${bgColor} rounded-lg border ${borderColor}">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="font-bold ${textColor} text-base">${icon} ${item.emoji} ${item.name}</p>
+                                <p class="text-sm ${textColor.replace('900', '700').replace('200', '300')} mt-1">
+                                    Expires: ${item.expiry} ${statusText}
+                                </p>
+                                <p class="text-xs ${textColor.replace('900', '700').replace('200', '300')} mt-2">Qty: ${item.qty}</p>
+                            </div>
+                            <button class="btn btn-secondary text-xs" onclick="deleteItem(${item.id})">Remove</button>
+                        </div>
+                    </div>
+                `;
+            }).join('') : '<p class="text-slate-600 dark:text-slate-400 text-center py-6">✅ No expiring items! Your inventory is fresh.</p>';
+
+            document.getElementById('expiryAlertsContainer').innerHTML = html;
+        }
+
+        function checkExpiryWithGemini() {
+            const expiringItems = appState.inventory
+                .filter(i => {
+                    const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
+                    return days <= 5;
+                })
+                .map(i => `${i.emoji} ${i.name} (expires ${i.expiry})`);
+
+            showNotification('🤖 Analyzing expiry data with Gemini...', 'info');
+            log('Checking expiry with Gemini', 'alerts');
+
+            setTimeout(() => {
+                const recommendations = expiringItems.length > 0 ? 
+                    `Use soon: ${expiringItems.join(', ')}. Consider recipes that use these items to minimize waste.` :
+                    'Your inventory is well managed! Keep monitoring items that are 3-5 days from expiry.';
+
+                const aiHTML = `
+                    <div class="p-4 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                        <p class="font-semibold text-slate-900 dark:text-white mb-2">🧠 Gemini AI Analysis</p>
+                        <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">${recommendations}</p>
+                        <p class="text-xs text-purple-600 dark:text-purple-400 mt-3">💡 Tip: Check our Recipes section for dishes that use these items!</p>
+                    </div>
+                `;
+                document.getElementById('aiInsightsContainer').innerHTML = aiHTML;
+                showNotification('✅ Gemini analysis complete!', 'success');
+            }, 1500);
+        }
+
+        function generateShoppingList() {
+            showNotification('📋 Generating shopping list with Gemini AI...', 'info');
+            log('Generating shopping list', 'alerts');
+
+            setTimeout(() => {
+                const currentInventory = appState.inventory.map(i => i.name).join(', ');
+                const suggestedItems = [
+                    { name: 'Fresh Vegetables Mix', emoji: '🥗', reason: 'Variety & nutrients', priority: 'High' },
+                    { name: 'Whole Wheat Bread', emoji: '🍞', reason: 'Dietary fiber', priority: 'High' },
+                    { name: 'Chicken Breast', emoji: '🍗', reason: 'Lean protein source', priority: 'High' },
+                    { name: 'Greek Yogurt', emoji: '🥛', reason: 'Protein & probiotics', priority: 'Medium' },
+                    { name: 'Olive Oil', emoji: '🫒', reason: 'Healthy cooking oil', priority: 'Medium' },
+                    { name: 'Berries (Fresh)', emoji: '🫐', reason: 'Antioxidants', priority: 'Medium' },
+                    { name: 'Quinoa', emoji: '🌾', reason: 'Complete protein', priority: 'Low' },
+                    { name: 'Almonds', emoji: '🥜', reason: 'Healthy snack', priority: 'Low' }
+                ];
+
+                document.getElementById('shoppingCount').textContent = suggestedItems.length;
+
+                const listHTML = suggestedItems.map(item => `
+                    <div class="p-4 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <p class="font-semibold text-slate-900 dark:text-white">${item.emoji} ${item.name}</p>
+                                <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">${item.reason}</p>
+                                <div class="mt-2 flex items-center gap-2">
+                                    <span class="px-2 py-1 rounded text-xs font-medium ${
+                                        item.priority === 'High' ? 'bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200' :
+                                        item.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-900 dark:text-yellow-200' :
+                                        'bg-green-100 dark:bg-green-900/40 text-green-900 dark:text-green-200'
+                                    }">${item.priority} Priority</span>
+                                </div>
+                            </div>
+                            <input type="checkbox" class="w-5 h-5 cursor-pointer mt-1" onchange="updateShoppingProgress()">
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('shoppingListContainer').innerHTML = `
+                    <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+                        <p class="text-sm text-blue-900 dark:text-blue-200"><strong>📊 Gemini Analysis:</strong> Based on your current inventory (${currentInventory}), these items will create balanced meals for the next week with variety and nutrition.</p>
+                    </div>
+                    ${listHTML}
+                    <button class="btn btn-secondary w-full mt-4" onclick="printShoppingList()">🖨️ Print List</button>
+                `;
+                showNotification('✅ Shopping list generated!', 'success');
+            }, 1500);
+        }
+
+        function updateShoppingProgress() {
+            const checkboxes = document.querySelectorAll('#shoppingListContainer input[type="checkbox"]');
+            const checked = Array.from(checkboxes).filter(c => c.checked).length;
+            if (checked === checkboxes.length && checkboxes.length > 0) {
+                showNotification('✨ Shopping list complete!', 'success', 2000);
+            }
+        }
+
+        function printShoppingList() {
+            const list = document.getElementById('shoppingListContainer').innerText;
+            const printWindow = window.open('', '', 'height=600,width=800');
+            printWindow.document.write('<pre>' + list + '</pre>');
+            printWindow.document.close();
+            printWindow.print();
+            showNotification('📋 Opening print dialog...', 'info');
+        }
+
+        // ==================== FITNESS TRACKER FUNCTIONS ====================
+        function generateAIWorkoutPlan() {
+            showNotification('🧠 Generating personalized workout plan with Gemini AI...', 'info');
+            log('Generating AI workout plan', 'fitness');
+
+            setTimeout(() => {
+                const plans = [
+                    { 
+                        week: 'Week 1-2: Foundation Building',
+                        days: [
+                            'Monday: Cardio 30 min (Running/Cycling)',
+                            'Wednesday: Strength Training 45 min',
+                            'Friday: HIIT Workout 30 min',
+                            'Sunday: Yoga & Recovery 40 min'
+                        ]
+                    },
+                    { 
+                        week: 'Week 3-4: Strength Focus',
+                        days: [
+                            'Monday: Upper Body Strength 50 min',
+                            'Wednesday: Lower Body Strength 50 min',
+                            'Friday: Full Body Circuit 45 min',
+                            'Saturday: Cardio & Flexibility 35 min'
+                        ]
+                    },
+                    { 
+                        week: 'Personalized Plan',
+                        days: [
+                            'Monday: 45 min Mixed Workout',
+                            'Wednesday: 60 min Strength Training',
+                            'Friday: 40 min Cardio',
+                            'Sunday: 30 min Yoga'
+                        ]
+                    }
+                ];
+
+                const plan = plans[Math.floor(Math.random() * plans.length)];
+                const html = `
+                    <div class="space-y-4">
+                        <div class="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg border border-purple-200 dark:border-purple-700">
+                            <h4 class="font-bold text-purple-900 dark:text-purple-200 mb-3">📅 ${plan.week}</h4>
+                            <div class="space-y-2">
+                                ${plan.days.map((day, idx) => `
+                                    <div class="text-sm text-purple-800 dark:text-purple-300 p-2 bg-white/50 dark:bg-slate-800/50 rounded">
+                                        <strong>💪 ${day}</strong>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700 text-xs text-blue-700 dark:text-blue-300">
+                            💡 <strong>Gemini AI Tip:</strong> This plan is tailored to your fitness level. Adjust intensity based on how you feel. Rest days are as important as workout days!
+                        </div>
+                    </div>
+                `;
+                document.getElementById('aiWorkoutPlan').innerHTML = html;
+                showNotification('✅ AI workout plan generated successfully!', 'success');
+                log('AI workout plan generated', 'fitness');
+            }, 1500);
+        }
+
+        function startWorkout() {
+            const workoutName = prompt('Enter workout name (e.g., Running, Weight Training, Yoga):');
+            if (!workoutName) return;
+
+            const duration = prompt('Enter duration in minutes:');
+            if (!duration || isNaN(duration)) return;
+
+            const caloriesEstimate = Math.round(duration * 7); // Rough estimate
+
+            appState.fitnessData.workouts.unshift({
+                id: appState.fitnessData.workouts.length + 1,
+                name: workoutName,
+                emoji: '🏃',
+                duration: parseInt(duration),
+                calories: caloriesEstimate,
+                date: new Date().toLocaleDateString()
+            });
+
+            appState.fitnessData.caloriesBurned += caloriesEstimate;
+            appState.fitnessData.todayDuration += parseInt(duration);
+
+            updateFitnessDisplay();
+            showNotification(`✅ Workout logged! ${caloriesEstimate} calories burned`, 'success');
+            log(`Workout logged: ${workoutName}`, 'fitness');
+        }
+
+        function updateFitnessDisplay() {
+            const durationEl = document.getElementById('workoutDuration');
+            const caloriesEl = document.getElementById('caloriesBurned');
+            
+            if (durationEl) durationEl.textContent = appState.fitnessData.todayDuration + ' min';
+            if (caloriesEl) caloriesEl.textContent = appState.fitnessData.caloriesBurned + ' kcal';
+        }
+
+        function renderFitnessTracker() {
+            updateFitnessDisplay();
+            log('Fitness tracker rendered', 'fitness');
+        }
+
+
+
+        function renderRecipesView() {
+            // Generate calorie-based recipe suggestions
+            generateCalorieBasedSuggestions();
+            log('Recipes view rendered', 'recipes');
+        }
+
+        function generateCalorieBasedSuggestions() {
+            const calorieGoal = parseInt(localStorage.getItem('calorieGoal')) || 2000;
+            const calorieRanges = [
+                { name: 'Breakfast (25%)', cals: Math.round(calorieGoal * 0.25), emoji: '🥞', examples: ['Oatmeal', 'Egg Scramble', 'Pancakes', 'Smoothie Bowl'] },
+                { name: 'Lunch (35%)', cals: Math.round(calorieGoal * 0.35), emoji: '🥗', examples: ['Chicken Salad', 'Sandwich', 'Pasta', 'Grilled Fish'] },
+                { name: 'Dinner (40%)', cals: Math.round(calorieGoal * 0.40), emoji: '🍲', examples: ['Steak & Vegetables', 'Rice Bowl', 'Curry', 'Grilled Chicken'] }
+            ];
+
+            const suggestionsHtml = calorieRanges.map(range => `
+                <div class="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all" onclick="searchRecipeByDish('${range.examples[Math.floor(Math.random() * range.examples.length)]}')">
+                    <p class="font-semibold text-slate-900 dark:text-white">${range.emoji} ${range.name}</p>
+                    <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">Target: ${range.cals} cal</p>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        ${range.examples.map(ex => `<span class="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded cursor-pointer hover:bg-slate-200" onclick="event.stopPropagation(); searchRecipeByDish('${ex}')">${ex}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('calorieBasedSuggestions').innerHTML = suggestionsHtml;
+        }
+
+        async function searchRecipeByDish(dishName) {
+            const inputField = document.getElementById('dishNameInput');
+            const finalDishName = dishName || inputField.value.trim();
+            
+            if (!finalDishName) {
+                showNotification('Please enter a dish name', 'warning');
+                return;
+            }
+
+            // Update input field if called from suggestion
+            if (dishName) {
+                inputField.value = dishName;
+            }
+
+            const btn = document.getElementById('fetchRecipeBtn');
+            const spinner = document.getElementById('recipeLoadingSpinner');
+            const container = document.getElementById('fetchedRecipesContainer');
+            const resultsDiv = document.getElementById('recipeResults');
+            const noMsg = document.getElementById('noRecipesMsg');
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            noMsg.classList.add('hidden');
+
+            try {
+                // Simulated Gemini API call - generates recipe based on dish name
+                const recipes = generateRecipeFromGemini(finalDishName);
+                
+                if (recipes && recipes.length > 0) {
+                    resultsDiv.innerHTML = recipes.map(recipe => `
+                        <div class="card">
+                            <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-2">${recipe.emoji} ${recipe.name}</h3>
+                            <div class="mb-3 p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs text-slate-700 dark:text-slate-300">
+                                <p class="font-semibold mb-1">⏱️ Prep: ${recipe.prep} | 🔥 Calories: ${recipe.calories}</p>
+                            </div>
+                            <div class="mb-3">
+                                <p class="text-xs font-semibold mb-2 text-slate-900 dark:text-white">📝 Ingredients:</p>
+                                <ul class="text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                                    ${recipe.ingredients.map(ing => `<li>• ${ing}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div class="mb-3">
+                                <p class="text-xs font-semibold mb-2 text-slate-900 dark:text-white">👨‍🍳 Instructions:</p>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">${recipe.instructions}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-primary flex-1" onclick="showNotification('✅ Recipe saved to favorites!', 'success')">❤️ Save</button>
+                                <button class="btn btn-secondary flex-1" onclick="showNotification('Recipe shared! 📱', 'info')">📤 Share</button>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    container.classList.remove('hidden');
+                } else {
+                    showNotification('No recipes found for that dish', 'warning');
+                }
+            } catch (error) {
+                log(`Error fetching recipe: ${error.message}`, 'error');
+                showNotification('Failed to fetch recipe', 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function generateRecipeFromGemini(dishName) {
+            // Simulated Gemini AI recipe generation
+            const recipeDatabase = {
+                'pasta': [
+                    {
+                        name: 'Creamy Garlic Pasta',
+                        emoji: '🍝',
+                        prep: '20 mins',
+                        calories: 650,
+                        ingredients: ['400g pasta', '4 cloves garlic', '200ml heavy cream', '100g parmesan', 'Salt & pepper', 'Olive oil'],
+                        instructions: 'Cook pasta. Sauté garlic in olive oil, add cream, toss with pasta and parmesan. Season to taste.'
+                    }
+                ],
+                'salad': [
+                    {
+                        name: 'Fresh Garden Salad',
+                        emoji: '🥗',
+                        prep: '10 mins',
+                        calories: 280,
+                        ingredients: ['Mixed greens', 'Cherry tomatoes', 'Cucumber', 'Red onion', 'Olive oil dressing'],
+                        instructions: 'Wash greens and vegetables. Chop and toss together. Drizzle with olive oil and vinegar dressing.'
+                    }
+                ],
+                'chicken': [
+                    {
+                        name: 'Grilled Herb Chicken',
+                        emoji: '🍗',
+                        prep: '30 mins',
+                        calories: 420,
+                        ingredients: ['Chicken breast', 'Rosemary', 'Thyme', 'Lemon juice', 'Olive oil', 'Salt & pepper'],
+                        instructions: 'Marinate chicken in herbs and lemon for 15 mins. Grill for 15-20 mins until cooked through.'
+                    }
+                ],
+                'sandwich': [
+                    {
+                        name: 'Classic BLT',
+                        emoji: '🥪',
+                        prep: '15 mins',
+                        calories: 480,
+                        ingredients: ['2 slices bread', 'Bacon', 'Lettuce', 'Tomato', 'Mayo'],
+                        instructions: 'Toast bread. Layer bacon, lettuce, tomato, and mayo between slices. Serve fresh.'
+                    }
+                ],
+                'smoothie': [
+                    {
+                        name: 'Berry Banana Smoothie',
+                        emoji: '🥤',
+                        prep: '5 mins',
+                        calories: 320,
+                        ingredients: ['1 banana', 'Mixed berries', '200ml yogurt', 'Honey', 'Milk'],
+                        instructions: 'Blend all ingredients until smooth. Add ice if desired. Serve chilled immediately.'
+                    }
+                ],
+                'rice': [
+                    {
+                        name: 'Vegetable Fried Rice',
+                        emoji: '🍚',
+                        prep: '25 mins',
+                        calories: 380,
+                        ingredients: ['2 cups cooked rice', 'Mixed vegetables', 'Egg', 'Soy sauce', 'Sesame oil'],
+                        instructions: 'Heat oil, stir-fry vegetables, add rice, egg, and soy sauce. Cook until heated through.'
+                    }
+                ],
+                'fish': [
+                    {
+                        name: 'Baked Lemon Fish',
+                        emoji: '🐟',
+                        prep: '25 mins',
+                        calories: 350,
+                        ingredients: ['Fish fillet', 'Lemon', 'Garlic', 'Olive oil', 'Herbs'],
+                        instructions: 'Place fish on foil, top with lemon slices and garlic. Bake at 200°C for 20 mins.'
+                    }
+                ],
+                'curry': [
+                    {
+                        name: 'Vegetable Curry',
+                        emoji: '🍛',
+                        prep: '35 mins',
+                        calories: 420,
+                        ingredients: ['Mixed vegetables', 'Curry paste', 'Coconut milk', 'Onion', 'Garlic', 'Rice'],
+                        instructions: 'Sauté onion and garlic, add curry paste, vegetables, and coconut milk. Simmer 20 mins. Serve with rice.'
+                    }
+                ],
+                'egg': [
+                    {
+                        name: 'Egg Scramble',
+                        emoji: '🍳',
+                        prep: '10 mins',
+                        calories: 300,
+                        ingredients: ['3 eggs', 'Butter', 'Cheese', 'Peppers', 'Onion', 'Salt & pepper'],
+                        instructions: 'Whisk eggs, melt butter in pan, add vegetables, pour eggs, scramble until cooked. Top with cheese.'
+                    }
+                ],
+                'oatmeal': [
+                    {
+                        name: 'Berry Oatmeal',
+                        emoji: '🥣',
+                        prep: '15 mins',
+                        calories: 350,
+                        ingredients: ['1 cup oats', 'Water or milk', 'Mixed berries', 'Honey', 'Nuts'],
+                        instructions: 'Boil water/milk, add oats, cook 5 mins. Top with berries, honey, and nuts. Serve warm.'
+                    }
+                ]
+            };
+
+            const searchKey = dishName.toLowerCase().trim();
+            
+            // Check if exact match exists in database
+            for (const [key, recipes] of Object.entries(recipeDatabase)) {
+                if (searchKey.includes(key) || key.includes(searchKey)) {
+                    return recipes;
+                }
+            }
+
+            // If no match, return a generic recipe based on the input
+            return [
+                {
+                    name: `${dishName} Recipe`,
+                    emoji: '🍽️',
+                    prep: '20-30 mins',
+                    calories: 400,
+                    ingredients: ['Basic ingredients for ' + dishName, 'Seasonings', 'Cooking oil', 'Your preferred base ingredient'],
+                    instructions: `Prepare all ingredients for ${dishName}. Combine and cook according to your preferred cooking method. Season to taste and serve hot.`
+                }
+            ];
+        }
+
+        function updateDashboard() {
+            const total = appState.inventory.length;
+            const expiring = appState.inventory.filter(i => !i.fresh).length;
+            const avg = 78;
+            
+            document.querySelector('[data-stat="total"]').textContent = total;
+            document.querySelector('[data-stat="expiring"]').textContent = expiring;
+            document.querySelector('[data-stat="freshness"]').textContent = avg + '%';
+        }
+
+        // ==================== WEEKLY MEAL PLAN ====================
+        function generateWeeklyMealPlan() {
+            const calTarget = localStorage.getItem('calorieGoal') || '2000';
+            document.getElementById('weeklyCalTarget').textContent = calTarget;
+            
+            showNotification('🧠 Generating personalized weekly meal plan with Gemini AI...', 'info');
+            log(`Generating meal plan for ${calTarget} kcal/day`, 'mealplan');
+
+            setTimeout(() => {
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const mealPlans = {
+                    Monday: ['🥗 Greek Salad with Chickpeas', '🍝 Pasta Primavera', '🥘 Vegetable Curry Rice'],
+                    Tuesday: ['🥯 Whole Grain Toast & Avocado', '🥙 Veggie Wrap', '🍲 Lentil Soup'],
+                    Wednesday: ['🍎 Apple & Almond Butter Toast', '🥗 Quinoa Buddha Bowl', '🍜 Stir-fried Noodles'],
+                    Thursday: ['🥣 Oatmeal with Berries', '🥪 Hummus Veggie Sandwich', '🍛 Chickpea Curry'],
+                    Friday: ['🥐 Whole Wheat Croissant', '🍱 Sushi & Vegetables', '🥘 Roasted Vegetables'],
+                    Saturday: ['🥞 Whole Wheat Pancakes', '🥗 Garden Salad Bowl', '🍝 Pasta with Marinara'],
+                    Sunday: ['🍳 Vegetable Omelette', '🌮 Veggie Tacos', '🥘 Slow Cooker Soup']
+                };
+
+                const dailyCals = {
+                    Breakfast: Math.round(parseInt(calTarget) * 0.25),
+                    Lunch: Math.round(parseInt(calTarget) * 0.35),
+                    Dinner: Math.round(parseInt(calTarget) * 0.40)
+                };
+
+                let html = '';
+                days.forEach((day, idx) => {
+                    const meals = mealPlans[day];
+                    const colors = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-pink-50', 'bg-indigo-50', 'bg-cyan-50'];
+                    const darkColors = ['dark:bg-blue-900/30', 'dark:bg-green-900/30', 'dark:bg-purple-900/30', 'dark:bg-orange-900/30', 'dark:bg-pink-900/30', 'dark:bg-indigo-900/30', 'dark:bg-cyan-900/30'];
+                    const borderColors = ['border-blue-200', 'border-green-200', 'border-purple-200', 'border-orange-200', 'border-pink-200', 'border-indigo-200', 'border-cyan-200'];
+                    const textColors = ['text-blue-900', 'text-green-900', 'text-purple-900', 'text-orange-900', 'text-pink-900', 'text-indigo-900', 'text-cyan-900'];
+                    const textDarkColors = ['dark:text-blue-200', 'dark:text-green-200', 'dark:text-purple-200', 'dark:text-orange-200', 'dark:text-pink-200', 'dark:text-indigo-200', 'dark:text-cyan-200'];
+                    
+                    html += `
+                        <div class="p-4 ${colors[idx]} ${darkColors[idx]} rounded-lg border-2 ${borderColors[idx]} dark:border-slate-600">
+                            <h4 class="font-bold ${textColors[idx]} ${textDarkColors[idx]} mb-3 text-center">${day}</h4>
+                            <div class="space-y-2 text-xs">
+                                <div class="p-2 bg-white/60 dark:bg-slate-800/60 rounded"><strong>🌅 Breakfast</strong><p class="text-slate-700 dark:text-slate-300 mt-1">${meals[0]}</p><p class="text-slate-500 dark:text-slate-400 mt-1">~${dailyCals.Breakfast} kcal</p></div>
+                                <div class="p-2 bg-white/60 dark:bg-slate-800/60 rounded"><strong>🌤️ Lunch</strong><p class="text-slate-700 dark:text-slate-300 mt-1">${meals[1]}</p><p class="text-slate-500 dark:text-slate-400 mt-1">~${dailyCals.Lunch} kcal</p></div>
+                                <div class="p-2 bg-white/60 dark:bg-slate-800/60 rounded"><strong>🌙 Dinner</strong><p class="text-slate-700 dark:text-slate-300 mt-1">${meals[2]}</p><p class="text-slate-500 dark:text-slate-400 mt-1">~${dailyCals.Dinner} kcal</p></div>
+                                <div class="p-2 border-t border-white/50 dark:border-slate-700 mt-2 text-center font-bold ${textColors[idx]} ${textDarkColors[idx]}">Total: ${calTarget} kcal</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('weeklyMealPlan').innerHTML = html;
+                showNotification('✅ Weekly meal plan generated by Gemini AI!', 'success');
+                log('Weekly meal plan generated successfully', 'mealplan');
+            }, 2000);
+        }
+
+        // ==================== AUTHENTICATION FUNCTIONS ====================
+        function doLogout() {
+            console.log('doLogout called');
+            alert('You will be logged out');
+            appState.isLoggedIn = false;
+            appState.currentUser = null;
+            localStorage.removeItem('currentUser');
+            showNotification('👋 Logged out successfully', 'info');
+            document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+            document.getElementById('profile').classList.remove('hidden');
+            showLoginScreen();
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            window.scrollTo(0, 0);
+        }
+
+        function showLoginScreen() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('signupScreen').classList.add('hidden');
+            document.getElementById('profileScreen').classList.add('hidden');
+            log('Showing login screen', 'auth');
+        }
+
+        function showSignupScreen() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('signupScreen').classList.remove('hidden');
+            document.getElementById('profileScreen').classList.add('hidden');
+            log('Showing signup screen', 'auth');
+        }
+
+        function showProfileScreen() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('signupScreen').classList.add('hidden');
+            document.getElementById('profileScreen').classList.remove('hidden');
+            loadUserProfile();
+            log('Showing profile screen', 'auth');
+        }
+
+        function handleLogin() {
+            const emailOrUsername = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!emailOrUsername || !password) {
+                showNotification('❌ Please fill in all fields', 'error');
+                return;
+            }
+
+            // Check credentials
+            const user = appState.users.find(u => 
+                (u.email === emailOrUsername || u.username === emailOrUsername) && u.password === password
+            );
+
+            if (user) {
+                appState.isLoggedIn = true;
+                appState.currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                showNotification(`👋 Welcome back, ${user.fullName}!`, 'success');
+                log(`User logged in: ${user.username}`, 'auth');
+                document.getElementById('loginEmail').value = '';
+                document.getElementById('loginPassword').value = '';
+                showProfileScreen();
+            } else {
+                showNotification('❌ Invalid username/email or password', 'error');
+                log('Login failed: Invalid credentials', 'auth');
+            }
+        }
+
+        function handleSignup() {
+            const fullName = document.getElementById('signupName').value.trim();
+            const email = document.getElementById('signupEmail').value.trim();
+            const username = document.getElementById('signupUsername').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const phone = document.getElementById('signupPhone').value.trim();
+            const age = document.getElementById('signupAge').value;
+
+            // Validation
+            if (!fullName || !email || !username || !password || !phone || !age) {
+                showNotification('❌ Please fill in all fields', 'error');
+                return;
+            }
+
+            if (password.length < 8) {
+                showNotification('❌ Password must be at least 8 characters', 'error');
+                return;
+            }
+
+            if (appState.users.find(u => u.email === email || u.username === username)) {
+                showNotification('❌ Email or username already exists', 'error');
+                return;
+            }
+
+            // Create new user
+            const newUser = {
+                id: appState.users.length + 1,
+                fullName,
+                email,
+                username,
+                password,
+                phone,
+                age: parseInt(age),
+                diet: 'Omnivore',
+                calorieGoal: 2000,
+                allergies: ''
+            };
+
+            appState.users.push(newUser);
+            appState.isLoggedIn = true;
+            appState.currentUser = newUser;
+            localStorage.setItem('currentUser', JSON.stringify(newUser));
+            
+            showNotification(`🎉 Welcome, ${fullName}! Account created successfully!`, 'success');
+            log(`New user registered: ${username}`, 'auth');
+            
+            // Clear form
+            document.getElementById('signupName').value = '';
+            document.getElementById('signupEmail').value = '';
+            document.getElementById('signupUsername').value = '';
+            document.getElementById('signupPassword').value = '';
+            document.getElementById('signupPhone').value = '';
+            document.getElementById('signupAge').value = '';
+            
+            showProfileScreen();
+        }
+
+        function handleLogout() {
+            console.log('Logout button clicked');
+            if (confirm('Are you sure you want to logout?')) {
+                console.log('User confirmed logout');
+                appState.isLoggedIn = false;
+                appState.currentUser = null;
+                localStorage.removeItem('currentUser');
+                showNotification('👋 You have been logged out', 'info');
+                log('User logged out', 'auth');
+                console.log('About to hide all views');
+                
+                // Hide all views
+                document.querySelectorAll('.view').forEach(v => {
+                    v.classList.add('hidden');
+                });
+                
+                console.log('About to show profile view');
+                // Show profile view
+                const profileView = document.getElementById('profile');
+                if (profileView) {
+                    profileView.classList.remove('hidden');
+                    console.log('Profile view shown');
+                } else {
+                    console.log('Profile view not found');
+                }
+                
+                console.log('About to show login screen');
+                // Show login screen
+                showLoginScreen();
+                
+                // Reset navigation
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('active');
+                });
+                closeSidebar();
+                window.scrollTo(0, 0);
+                console.log('Logout complete');
+            }
+        }
+
+        function loadUserProfile() {
+            if (appState.currentUser) {
+                const user = appState.currentUser;
+                document.getElementById('profileFullName').textContent = user.fullName;
+                document.getElementById('profileEmail').textContent = user.email;
+                document.getElementById('settingName').value = user.fullName;
+                document.getElementById('settingEmail').value = user.email;
+                document.getElementById('settingPhone').value = user.phone || '';
+                document.getElementById('settingAge').value = user.age || '';
+                document.getElementById('settingDiet').value = user.diet || 'Omnivore';
+                document.getElementById('settingCal').value = user.calorieGoal || 2000;
+                document.getElementById('settingAllergies').value = user.allergies || '';
+            }
+        }
+
+        function checkAuthStatus() {
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                try {
+                    appState.currentUser = JSON.parse(savedUser);
+                    appState.isLoggedIn = true;
+                    showProfileScreen();
+                } catch (e) {
+                    showLoginScreen();
+                }
+            } else {
+                showLoginScreen();
+            }
+        }
+
+        function saveSettings() {
+            if (!appState.currentUser) {
+                showNotification('❌ Please login first', 'error');
+                return;
+            }
+
+            const name = document.getElementById('settingName').value;
+            const email = document.getElementById('settingEmail').value;
+            const phone = document.getElementById('settingPhone').value;
+            const age = document.getElementById('settingAge').value;
+            const diet = document.getElementById('settingDiet').value;
+            const cal = document.getElementById('settingCal').value;
+            const allergies = document.getElementById('settingAllergies').value;
+            
+            // Update current user
+            appState.currentUser.fullName = name;
+            appState.currentUser.email = email;
+            appState.currentUser.phone = phone;
+            appState.currentUser.age = parseInt(age);
+            appState.currentUser.diet = diet;
+            appState.currentUser.calorieGoal = parseInt(cal);
+            appState.currentUser.allergies = allergies;
+
+            // Update in users array
+            const userIndex = appState.users.findIndex(u => u.id === appState.currentUser.id);
+            if (userIndex !== -1) {
+                appState.users[userIndex] = appState.currentUser;
+            }
+
+            localStorage.setItem('currentUser', JSON.stringify(appState.currentUser));
+            
+            showNotification('✅ Profile updated successfully!', 'success');
+            log('Profile updated', 'auth');
+        }
+
+        function resetProfile() {
+            if (appState.currentUser) {
+                loadUserProfile();
+                showNotification('↩️ Changes reset to saved values', 'info');
+            }
+        }
+
+        // ==================== DIET PLAN GENERATION ====================
+        function generateDietPlan() {
+            showNotification('🧠 Generating personalized diet plan with Gemini AI...', 'info');
+            log('Diet plan generation started', 'analysis');
+
+            setTimeout(() => {
+                const plans = [
+                    { day: 'Monday', meals: ['Breakfast: Oatmeal with apples & berries', 'Lunch: Carrot salad with chickpeas', 'Dinner: Vegetable stir-fry with rice'] },
+                    { day: 'Tuesday', meals: ['Breakfast: Greek yogurt with granola (dairy-free option available)', 'Lunch: Quinoa bowl with vegetables', 'Dinner: Lentil curry with whole wheat bread'] },
+                    { day: 'Wednesday', meals: ['Breakfast: Smoothie with banana & spinach', 'Lunch: Vegetable wrap', 'Dinner: Pasta primavera'] },
+                ];
+
+                const plan = plans[Math.floor(Math.random() * plans.length)];
+                const html = `
+                    <div class="space-y-4">
+                        <div class="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg border border-green-200 dark:border-green-700">
+                            <h4 class="font-bold text-green-900 dark:text-green-200 mb-3">📅 ${plan.day}'s Meal Plan</h4>
+                            <div class="space-y-2">
+                                ${plan.meals.map((meal, idx) => `
+                                    <div class="text-sm text-green-800 dark:text-green-300 p-2 bg-white/50 dark:bg-slate-800/50 rounded">
+                                        <strong>🍽️ ${idx === 0 ? 'Breakfast' : idx === 1 ? 'Lunch' : 'Dinner'}:</strong> ${meal.split(': ')[1]}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700 text-xs text-blue-700 dark:text-blue-300">
+                            💡 <strong>Gemini AI Tip:</strong> This plan is tailored to your dietary preferences and available inventory. Adjust portions as needed!
+                        </div>
+                    </div>
+                `;
+                document.getElementById('dietPlanContainer').innerHTML = html;
+                showNotification('✅ Diet plan generated successfully!', 'success');
+                log('Diet plan generated', 'analysis');
+            }, 2000);
+        }
+
+
+        // ==================== AI FOOD ANALYSIS ====================
+        let selectedFoodImage = null;
+
+        function analyzeFood() {
+            const fileInput = document.getElementById('foodImage');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                showNotification('⚠️ Image too large! Max 5MB', 'warning');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedFoodImage = e.target.result;
+                const fileName = file.name;
+                document.getElementById('imagePreview').innerHTML = `✅ Selected: <strong>${fileName}</strong>`;
+                showNotification(`✅ Image ready: ${fileName}`, 'success');
+                log(`Image selected: ${fileName}`, 'analysis');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function submitFoodAnalysis() {
+            if (!selectedFoodImage) {
+                showNotification('⚠️ Please select an image first!', 'warning');
+                return;
+            }
+
+            showNotification('🤖 Analyzing with Gemini AI...', 'info');
+            log('Starting Gemini AI analysis', 'analysis');
+
+            setTimeout(() => {
+                const analysisResults = [
+                    { 
+                        food: 'Apple', 
+                        nutrients: 'Vitamin C, Fiber, Antioxidants', 
+                        calories: 95,
+                        protein: '0.5g',
+                        carbs: '25g',
+                        fat: '0.3g',
+                        emoji: '🍎',
+                        date: new Date().toLocaleTimeString(),
+                        image: selectedFoodImage
+                    },
+                    { 
+                        food: 'Mixed Salad', 
+                        nutrients: 'Protein, Vitamins, Minerals', 
+                        calories: 120,
+                        protein: '4g',
+                        carbs: '15g',
+                        fat: '5g',
+                        emoji: '🥗',
+                        date: new Date().toLocaleTimeString(),
+                        image: selectedFoodImage
+                    }
+                ];
+
+                // Simulate analysis result
+                const result = analysisResults[Math.floor(Math.random() * analysisResults.length)];
+                
+                // Add to pending foods
+                const pendingFood = {
+                    tempId: 'pending_' + Date.now(),
+                    name: result.food,
+                    emoji: result.emoji,
+                    calories: result.calories,
+                    protein: result.protein,
+                    carbs: result.carbs,
+                    fat: result.fat,
+                    nutrients: result.nutrients,
+                    imageUrl: result.image,
+                    qty: 1,
+                    fresh: true,
+                    expiry: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0]
+                };
+                
+                appState.pendingAnalyzedFoods.push(pendingFood);
+                
+                let history = document.getElementById('analysisHistory');
+                const newAnalysis = document.createElement('div');
+                newAnalysis.className = 'p-3 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-700';
+                newAnalysis.innerHTML = `
+                    <p class="font-medium text-green-900 dark:text-green-200">✅ ${result.food}</p>
+                    <p class="text-xs text-green-700 dark:text-green-300 mt-1">Nutrients: ${result.nutrients}</p>
+                    <p class="text-xs text-green-700 dark:text-green-300">Energy: ${result.calories} cal | Protein: ${result.protein}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${result.date}</p>
+                    <button class="mt-2 btn btn-primary" style="padding: 6px 12px; font-size: 11px;" onclick="addAnalyzedFoodToInventory('${pendingFood.tempId}')">➕ Add to Inventory</button>
+                `;
+
+                if (history.innerHTML.includes('No analyses yet')) {
+                    history.innerHTML = '';
+                }
+                history.insertBefore(newAnalysis, history.firstChild);
+                
+                // Update pending foods display
+                renderPendingFoodItems();
+
+                showNotification(`🎉 Analysis complete! ${result.food} detected. Add to inventory?`, 'success');
+                log(`Analysis complete: ${result.food}`, 'analysis');
+
+                // Reset
+                selectedFoodImage = null;
+                document.getElementById('foodImage').value = '';
+                document.getElementById('imagePreview').innerHTML = 'PNG, JPG, GIF up to 5MB';
+            }, 2000);
+        }
+
+        // Add analyzed food to inventory
+        function addAnalyzedFoodToInventory(tempId) {
+            const pendingFood = appState.pendingAnalyzedFoods.find(f => f.tempId === tempId);
+            if (!pendingFood) return;
+
+            const newItem = {
+                id: appState.inventory.length + 1,
+                name: pendingFood.name,
+                emoji: pendingFood.emoji,
+                qty: pendingFood.qty,
+                fresh: pendingFood.fresh,
+                expiry: pendingFood.expiry,
+                calories: pendingFood.calories,
+                protein: pendingFood.protein,
+                carbs: pendingFood.carbs,
+                fat: pendingFood.fat,
+                nutrients: pendingFood.nutrients,
+                imageUrl: pendingFood.imageUrl,
+                sourceAnalysis: true,
+                addedDate: new Date().toLocaleDateString()
+            };
+
+            appState.inventory.push(newItem);
+            appState.pendingAnalyzedFoods = appState.pendingAnalyzedFoods.filter(f => f.tempId !== tempId);
+            
+            showNotification(`✅ ${pendingFood.name} added to inventory!`, 'success');
+            log(`Added analyzed food to inventory: ${pendingFood.name}`, 'inventory');
+            
+            renderPendingFoodItems();
+            renderInventoryView();
+        }
+
+        // Render pending food items
+        function renderPendingFoodItems() {
+            const container = document.getElementById('pendingFoodItems');
+            if (!container) return;
+
+            if (appState.pendingAnalyzedFoods.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-500 dark:text-slate-400 italic">No pending items. Upload and analyze food from AI Analysis section.</p>';
+                return;
+            }
+
+            container.innerHTML = appState.pendingAnalyzedFoods.map(food => `
+                <div class="p-3 bg-white dark:bg-slate-700 rounded-lg border border-green-300 dark:border-green-600 flex items-center justify-between">
+                    <div class="flex items-center gap-3 flex-1">
+                        <img src="${food.imageUrl}" alt="${food.name}" class="w-12 h-12 rounded-lg object-cover">
+                        <div>
+                            <p class="font-medium text-slate-900 dark:text-white">${food.emoji} ${food.name}</p>
+                            <p class="text-xs text-slate-600 dark:text-slate-400">${food.calories} cal | ${food.protein} protein</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 11px; white-space: nowrap;" onclick="addAnalyzedFoodToInventory('${food.tempId}')">➕ Add</button>
+                </div>
+            `).join('');
+        }
+
+
+        // ==================== EVENT LISTENERS ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mobile menu
+            const menuBtn = document.getElementById('mobileMenuBtn');
+            if (menuBtn) {
+                menuBtn.addEventListener('click', openSidebar);
+            }
+
+            // Dark mode
+            const darkToggle = document.getElementById('darkModeToggle');
+            if (darkToggle) {
+                darkToggle.addEventListener('change', function() {
+                    document.documentElement.classList.toggle('dark', this.checked);
+                    localStorage.setItem('darkMode', this.checked);
+                    log('Dark mode toggled: ' + (this.checked ? 'ON' : 'OFF'), 'ui');
+                });
+            }
+
+            // Nav links - event delegation
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const viewName = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    switchView(e, viewName);
+                });
+            });
+
+            // Sidebar overlay
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) {
+                overlay.addEventListener('click', closeSidebar);
+            }
+        });
+
+        // ==================== INITIALIZATION ====================
+        async function initApp() {
+            log('🚀 Initializing Infinium v2.0...', 'boot');
+            
+            // Load theme
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+                const toggle = document.getElementById('darkModeToggle');
+                if (toggle) toggle.checked = true;
+            }
+
+            // Check authentication first
+            checkAuthStatus();
+
+            // Check backend
+            await checkBackendConnection();
+            
+            // Only render main views if user is authenticated
+            if (appState.isLoggedIn) {
+                renderPendingFoodItems();
+                renderInventoryView();
+                renderAlertsView();
+                renderRecipesView();
+                renderFitnessTracker();
+                updateDashboard();
+                generateWeeklyMealPlan();
+                showNotification('🎉 Welcome to Infinium! All systems ready.', 'success', 4000);
+            }
+
+            log('Application fully initialized', 'boot');
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+    </script>
+</body>
+</html>
+
